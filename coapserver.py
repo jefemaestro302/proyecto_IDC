@@ -44,7 +44,7 @@ def turnOnLed(packet, senderIp, senderPort):
     client.sendResponse(senderIp, senderPort, packet.messageid,
                       "Led encendido", coapy.COAP_RESPONSE_CODE.COAP_CONTENT,
                       coapy.COAP_CONTENT_FORMAT.COAP_NONE, packet.token)
-    returnHeartbeat(packet, senderIp, senderPort)
+    
 
 
 def turnOffLed(packet, senderIp, senderPort):
@@ -53,7 +53,7 @@ def turnOffLed(packet, senderIp, senderPort):
     client.sendResponse(senderIp, senderPort, packet.messageid,
                       "Led apagado", coapy.COAP_RESPONSE_CODE.COAP_CONTENT,
                       coapy.COAP_CONTENT_FORMAT.COAP_NONE, packet.token)
-    returnHeartbeat(packet, senderIp, senderPort)
+    
 
 
 def returnSensor(packet, senderIp, senderPort):
@@ -71,18 +71,18 @@ def stop_led():
 client = coapy.Coap()
 # setup callback for incoming response to a request
 client.addIncomingRequestCallback('led/turnOn', turnOnLed)
-client.addIncomingRequestCallback('led/turnOff', measureCurrent)
-client.addIncomingRequestCallback('sensor/return', returnMessage)
+client.addIncomingRequestCallback('led/turnOff', turnOffLed)
+client.addIncomingRequestCallback('sensor/return', returnSensor)
 
 
 # Starting CoAP...
 client.start()
 
-# wait for incoming request for 60 seconds
-timeoutMs = 60000
-start_time = time.ticks_ms()
-while time.ticks_diff(time.ticks_ms(), start_time) < timeoutMs:
-    client.poll(60000)
+# wait for incoming request
+
+
+while True:
+    client.poll(600)
 
 # stop CoAP
 client.stop()
