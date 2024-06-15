@@ -5,6 +5,7 @@ from machine import Pin
 import socket
 import coapy
 import dht
+import _thread
 
 led = machine.Pin("LED", machine.Pin.OUT)
 sensor = dht.DHT11(Pin(15))   #sensor
@@ -68,8 +69,39 @@ def returnSensor(packet, senderIp, senderPort):
         response = f'Error al leer el sensor: {str(e)}'
      
     client.sendResponse(senderIp, senderPort, packet.messageid,
-                      None, coapy.COAP_RESPONSE_CODE.COAP_SENSOR_HEARTBEAT,
+                      temperature, coapy.COAP_RESPONSE_CODE.COAP_SENSOR_HEARTBEAT,
                       coapy.COAP_CONTENT_FORMAT.COAP_NONE, packet.token)
+    
+
+
+def observeSensor(packet, senderIp, senderPort):
+    global observers
+    print('Observe request received:', packet.toString(), ', from: ', senderIp, ":", senderPort)
+    observers.append((senderIp, senderPort))
+    client.sendResponse(senderIp, senderPort, packet.messageid,
+                      "Observing sensor", coapy.COAP_RESPONSE_CODE.COAP_CONTENT,
+                      coapy.COAP_CONTENT_FORMAT.COAP_NONE, packet.token)
+    
+
+
+def notify_observers():
+    global observers
+    while True:
+        time.sleep(10)  # Notify every 10 seconds
+        try:
+            sensor.measure()
+            temperature = sensor.temperature()
+            message = f'Temperature: {temperature} C'
+        except Exception as e:
+            message = f'Error: {str(e)}'
+        
+        for observer in observers:
+            addr = (observer[0], observer[1])
+            client.sendResponse(addr[0], addr[1], 0,
+                                message, coapy.COAP_RESPONSE_CODE.COAP_CONTENT,
+                                coapy.COAP_CONTENT_FORMAT.COAP_NONE)
+        print("Notified observers")
+
 
 def start_led():
     led.on()
@@ -87,8 +119,8 @@ client.addIncomingRequestCallback('sensor/return', returnSensor)
 # Starting CoAP...
 client.start()
 
-# wait for incoming request
-
+# start the thread
+_thread.start_new_thread(notify_observers, ())
 
 while True:
     client.poll(600)
