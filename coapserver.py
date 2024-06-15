@@ -4,9 +4,10 @@ import machine
 from machine import Pin
 import socket
 import coapy
-
+import dht
 
 led = machine.Pin("LED", machine.Pin.OUT)
+sensor = dht.DHT11(Pin(15))   #sensor
 
 my_ssid = "POCO_F3"
 my_password = "12345678"
@@ -58,6 +59,14 @@ def turnOffLed(packet, senderIp, senderPort):
 
 def returnSensor(packet, senderIp, senderPort):
     print('Heartbeat received:', packet.toString(), ', from: ', senderIp, ":", senderPort)
+
+    try:
+        sensor.measure() 
+        temperature = sensor.temperature()
+        response = f'Temperature: {temperature} C'
+    except Exception as e:
+        response = f'Error al leer el sensor: {str(e)}'
+     
     client.sendResponse(senderIp, senderPort, packet.messageid,
                       None, coapy.COAP_RESPONSE_CODE.COAP_SENSOR_HEARTBEAT,
                       coapy.COAP_CONTENT_FORMAT.COAP_NONE, packet.token)
