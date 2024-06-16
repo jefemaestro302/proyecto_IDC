@@ -65,7 +65,7 @@ COAP_RESPONSE_CODE = enum(
     COAP_SERVICE_UNAVALIABLE=CoapResponseCode.encode(5, 3),
     COAP_GATEWAY_TIMEOUT=CoapResponseCode.encode(5, 4),
     COAP_PROXYING_NOT_SUPPORTED=CoapResponseCode.encode(5, 5),
-    COAP_SENSOR_HEARTBEAT=CoapResponseCode.encode(6, 0),
+    
 )
 
 COAP_OPTION_NUMBER = enum(

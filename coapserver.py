@@ -9,9 +9,12 @@ import _thread
 
 led = machine.Pin("LED", machine.Pin.OUT)
 sensor = dht.DHT11(Pin(15))   #sensor
+observers = []  
 
 my_ssid = "POCO_F3"
 my_password = "12345678"
+#my_ssid = "DIGIFIBRA-P5fG"
+#my_password = "xfxRPD3sxc"
 SERVER_PORT = 5683  # default CoAP port
 
 
@@ -38,6 +41,22 @@ def connectToWifi():
 
 connectToWifi()
 
+def get_sensor_data():
+    
+    try:
+        sensor.measure() 
+        temperature = sensor.temperature()
+        response = f'Temperature: {temperature} C'
+    except Exception as e:
+        response = f'Error al leer el sensor: {str(e)}'
+
+
+def return_client_port(packet, senderIp, senderPort):
+    print('Client port request received:', packet.toString(), ', from: ', senderIp, ":", senderPort)
+    client.sendResponse(senderIp, senderPort, packet.messageid,
+                      str(SERVER_PORT), coapy.COAP_RESPONSE_CODE.COAP_CONTENT,
+                      coapy.COAP_CONTENT_FORMAT.COAP_TEXT_PLAIN, packet.token)
+
 
 def turnOnLed(packet, senderIp, senderPort):
     print('Turn-on-led request received:', packet.toString(), ', from: ', senderIp, ":", senderPort)
@@ -45,7 +64,7 @@ def turnOnLed(packet, senderIp, senderPort):
     
     client.sendResponse(senderIp, senderPort, packet.messageid,
                       "Led encendido", coapy.COAP_RESPONSE_CODE.COAP_CONTENT,
-                      coapy.COAP_CONTENT_FORMAT.COAP_NONE, packet.token)
+                      coapy.COAP_CONTENT_FORMAT.COAP_TEXT_PLAIN, packet.token)
     
 
 
@@ -54,52 +73,45 @@ def turnOffLed(packet, senderIp, senderPort):
     stop_led()
     client.sendResponse(senderIp, senderPort, packet.messageid,
                       "Led apagado", coapy.COAP_RESPONSE_CODE.COAP_CONTENT,
-                      coapy.COAP_CONTENT_FORMAT.COAP_NONE, packet.token)
+                      coapy.COAP_CONTENT_FORMAT.COAP_TEXT_PLAIN, packet.token)
     
 
 
 def returnSensor(packet, senderIp, senderPort):
     print('Heartbeat received:', packet.toString(), ', from: ', senderIp, ":", senderPort)
 
-    try:
-        sensor.measure() 
-        temperature = sensor.temperature()
-        response = f'Temperature: {temperature} C'
-    except Exception as e:
-        response = f'Error al leer el sensor: {str(e)}'
+    temperature = get_sensor_data()
+   
      
     client.sendResponse(senderIp, senderPort, packet.messageid,
-                      temperature, coapy.COAP_RESPONSE_CODE.COAP_SENSOR_HEARTBEAT,
-                      coapy.COAP_CONTENT_FORMAT.COAP_NONE, packet.token)
+                      str(temperature), coapy.COAP_RESPONSE_CODE.COAP_SENSOR_HEARTBEAT,
+                      coapy.COAP_CONTENT_FORMAT.COAP_TEXT_PLAIN, packet.token)
     
 
 
 def observeSensor(packet, senderIp, senderPort):
     global observers
     print('Observe request received:', packet.toString(), ', from: ', senderIp, ":", senderPort)
-    observers.append((senderIp, senderPort))
+    observers.append((senderIp, senderPort, packet.messageid, packet.token))
     client.sendResponse(senderIp, senderPort, packet.messageid,
-                      "Observing sensor", coapy.COAP_RESPONSE_CODE.COAP_CONTENT,
-                      coapy.COAP_CONTENT_FORMAT.COAP_NONE, packet.token)
-    
+                      str(senderPort), coapy.COAP_RESPONSE_CODE.COAP_SENSOR_HEARTBEAT_OBSERVE,
+                      coapy.COAP_CONTENT_FORMAT.COAP_TEXT_PLAIN, packet.token)
+    notify_observers()
 
 
 def notify_observers():
     global observers
     while True:
         time.sleep(10)  # Notify every 10 seconds
-        try:
-            sensor.measure()
-            temperature = sensor.temperature()
-            message = f'Temperature: {temperature} C'
-        except Exception as e:
-            message = f'Error: {str(e)}'
+        result = "1" #placeholder por la funcion
         
         for observer in observers:
-            addr = (observer[0], observer[1])
-            client.sendResponse(addr[0], addr[1], 0,
-                                message, coapy.COAP_RESPONSE_CODE.COAP_CONTENT,
-                                coapy.COAP_CONTENT_FORMAT.COAP_NONE)
+            addr = (observer[0], observer[1], observer[2], observer[3])
+            print("Notifying observer: ", addr)
+            print(coapy.COAP_RESPONSE_CODE.COAP_SENSOR_HEARTBEAT)
+            client.sendResponse(addr[0], addr[1], addr[2],
+                                str(result), coapy.COAP_RESPONSE_CODE.COAP_SENSOR_HEARTBEAT_OBSERVE,
+                                coapy.COAP_CONTENT_FORMAT.COAP_TEXT_PLAIN, addr[3])
         print("Notified observers")
 
 
@@ -114,7 +126,8 @@ client = coapy.Coap()
 client.addIncomingRequestCallback('led/turnOn', turnOnLed)
 client.addIncomingRequestCallback('led/turnOff', turnOffLed)
 client.addIncomingRequestCallback('sensor/return', returnSensor)
-
+client.addIncomingRequestCallback('sensor/observe', observeSensor)
+client.addIncomingRequestCallback('clientport', return_client_port)
 
 # Starting CoAP...
 client.start()
