@@ -62,6 +62,7 @@ def turnOnLed(packet, senderIp, senderPort):
     print('Turn-on-led request received:', packet.toString(), ', from: ', senderIp, ":", senderPort)
     start_led()
     
+    
     client.sendResponse(senderIp, senderPort, packet.messageid,
                       "Led encendido", coapy.COAP_RESPONSE_CODE.COAP_CONTENT,
                       coapy.COAP_CONTENT_FORMAT.COAP_TEXT_PLAIN, packet.token)
@@ -84,7 +85,7 @@ def returnSensor(packet, senderIp, senderPort):
    
      
     client.sendResponse(senderIp, senderPort, packet.messageid,
-                      str(temperature), coapy.COAP_RESPONSE_CODE.COAP_SENSOR_HEARTBEAT,
+                      str(temperature), coapy.COAP_RESPONSE_CODE.COAP_CONTENT,
                       coapy.COAP_CONTENT_FORMAT.COAP_TEXT_PLAIN, packet.token)
     
 
@@ -94,7 +95,7 @@ def observeSensor(packet, senderIp, senderPort):
     print('Observe request received:', packet.toString(), ', from: ', senderIp, ":", senderPort)
     observers.append((senderIp, senderPort, packet.messageid, packet.token))
     client.sendResponse(senderIp, senderPort, packet.messageid,
-                      str(senderPort), coapy.COAP_RESPONSE_CODE.COAP_SENSOR_HEARTBEAT_OBSERVE,
+                      str(senderPort), coapy.COAP_RESPONSE_CODE.COAP_CONTENT,
                       coapy.COAP_CONTENT_FORMAT.COAP_TEXT_PLAIN, packet.token)
     notify_observers()
 
@@ -103,14 +104,15 @@ def notify_observers():
     global observers
     while True:
         time.sleep(10)  # Notify every 10 seconds
-        result = "1" #placeholder por la funcion
+        result = get_sensor_data() #placeholder por la funcion
         
         for observer in observers:
             addr = (observer[0], observer[1], observer[2], observer[3])
             print("Notifying observer: ", addr)
-            print(coapy.COAP_RESPONSE_CODE.COAP_SENSOR_HEARTBEAT)
-            client.sendResponse(addr[0], addr[1], addr[2],
-                                str(result), coapy.COAP_RESPONSE_CODE.COAP_SENSOR_HEARTBEAT_OBSERVE,
+            
+            port = addr[1] + 1
+            client.sendResponse(addr[0], port, addr[2],
+                                str(result), coapy.COAP_RESPONSE_CODE.COAP_VALID,
                                 coapy.COAP_CONTENT_FORMAT.COAP_TEXT_PLAIN, addr[3])
         print("Notified observers")
 
@@ -133,10 +135,12 @@ client.addIncomingRequestCallback('clientport', return_client_port)
 client.start()
 
 # start the thread
+
 _thread.start_new_thread(notify_observers, ())
 
-while True:
-    client.poll(600)
+try:
+    while True:
+        client.poll(600)
 
-# stop CoAP
-client.stop()
+except keyboardInterrupt:
+    client.stop()
