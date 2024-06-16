@@ -142,5 +142,5 @@ try:
     while True:
         client.poll(600)
 
-except keyboardInterrupt:
+except KeyboardInterrupt:
     client.stop()
