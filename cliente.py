@@ -3,7 +3,7 @@ import aiocoap
 import threading
 import sys
 import socket
-
+import signal
 
 UDP_IP = "192.168.58.154"
 
@@ -30,22 +30,26 @@ def udp_listener(udp_port):
     sock.bind((UDP_IP, udp_port))
 
     print("UDP server up and listening")
-
-    while True:
-        data, addr = sock.recvfrom(1024)
-        print("received message:", data)
-        code, payload = parse_coap_message(data)
-        print("code: ", code)
-        print("payload: ", payload)
-        if code == CODIGO_HEARTBEAT:
-            print("Observation received")
+    try:
+        while True:
+            data, addr = sock.recvfrom(1024)
+            print("received message:", data)
+            code, payload = parse_coap_message(data)
+            print("code: ", code)
             print("payload: ", payload)
-            #start observation
-            #start_observation()
-        else:
-            print("Request")
-            #handle request
-            #handle_request()
+            if code == CODIGO_HEARTBEAT:
+                print("Observation received")
+                print("payload: ", payload.decode('utf-8'))
+                #start observation
+                #start_observation()
+            else:
+                print("Request")
+                #handle request
+                #handle_request()
+    except KeyboardInterrupt:
+        print("\nExiting due to Ctrl-C")
+    finally:
+        sock.close()
 
 
 
@@ -93,6 +97,18 @@ async def main():
     #udp_listener_thread.daemon = True
     #udp_listener_thread.start()
 
+    async def signal_handler(sig, frame):
+        print("\nExiting due to Ctrl-C")
+        if udp_listener_thread:
+            udp_listener_thread.join()
+
+    # Cerrar el contexto de cliente CoAP
+        await protocol.shutdown()
+
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+
     print("seleccione recurso a acceder")
     print("1. Encender led")
     print("2. Apagar led")
@@ -122,8 +138,9 @@ async def main():
             break
         else:
             print("Opcion no valida")
-    
 
+
+    
    
 
 if __name__ == "__main__":
